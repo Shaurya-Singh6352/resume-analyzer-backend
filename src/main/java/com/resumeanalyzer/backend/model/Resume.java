@@ -20,6 +20,10 @@ public class Resume {
 
     private LocalDateTime uploadedAt = LocalDateTime.now();
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id")
+    private User user;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -31,4 +35,7 @@ public class Resume {
 
     public LocalDateTime getUploadedAt() { return uploadedAt; }
     public void setUploadedAt(LocalDateTime uploadedAt) { this.uploadedAt = uploadedAt; }
+
+    public User getUser() { return user; }
+    public void setUser(User user) { this.user = user; }
 }

@@ -2,6 +2,7 @@ package com.resumeanalyzer.backend.service;
 
 import com.resumeanalyzer.backend.model.Resume;
 import com.resumeanalyzer.backend.repository.ResumeRepository;
+import com.resumeanalyzer.backend.repository.UserRepository;
 import org.apache.tika.Tika;
 import org.apache.tika.exception.TikaException;
 import org.springframework.http.HttpStatus;
@@ -23,14 +24,15 @@ public class ResumeService {
     );
 
     private final ResumeRepository resumeRepository;
+    private final UserRepository userRepository;
     private final Tika tika = new Tika();
 
-    // Spring passes in the repository automatically (constructor injection)
-    public ResumeService(ResumeRepository resumeRepository) {
+    public ResumeService(ResumeRepository resumeRepository, UserRepository userRepository) {
         this.resumeRepository = resumeRepository;
+        this.userRepository = userRepository;
     }
 
-    public Resume upload(MultipartFile file) {
+    public Resume upload(MultipartFile file, Long userId) {
         if (file.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The file is empty");
         }
@@ -38,7 +40,6 @@ public class ResumeService {
         try {
             byte[] bytes = file.getBytes();
 
-            // Tika checks the file's real content, not just its extension
             String type = tika.detect(bytes);
             if (!ALLOWED_TYPES.contains(type)) {
                 throw new ResponseStatusException(HttpStatus.UNSUPPORTED_MEDIA_TYPE,
@@ -54,6 +55,8 @@ public class ResumeService {
             Resume resume = new Resume();
             resume.setFileName(file.getOriginalFilename());
             resume.setExtractedText(text);
+            // getReferenceById links the user by id without loading the whole row
+            resume.setUser(userRepository.getReferenceById(userId));
             return resumeRepository.save(resume);
 
         } catch (IOException | TikaException e) {
@@ -61,8 +64,13 @@ public class ResumeService {
                     "Could not read this file", e);
         }
     }
-    public Resume getById(Long id) {
-        return resumeRepository.findById(id)
+
+    /**
+     * Finds a resume only if it belongs to this user. Someone else's resume gets
+     * the same 404 as one that doesn't exist, so ids can't be probed.
+     */
+    public Resume getOwned(Long id, Long userId) {
+        return resumeRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Resume not found"));
     }
 }

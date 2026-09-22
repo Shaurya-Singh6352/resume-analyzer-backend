@@ -6,6 +6,8 @@ import com.resumeanalyzer.backend.model.Resume;
 import com.resumeanalyzer.backend.service.ResumeService;
 import com.resumeanalyzer.backend.service.ScoringService;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -22,8 +24,9 @@ public class ResumeController {
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResumeUploadResponse upload(@RequestParam("file") MultipartFile file) {
-        Resume saved = resumeService.upload(file);
+    public ResumeUploadResponse upload(@RequestParam("file") MultipartFile file,
+                                       @AuthenticationPrincipal Jwt jwt) {
+        Resume saved = resumeService.upload(file, userId(jwt));
 
         String text = saved.getExtractedText();
         String preview = text.length() > 300 ? text.substring(0, 300) + "..." : text;
@@ -33,7 +36,13 @@ public class ResumeController {
     }
 
     @GetMapping("/{id}/analysis")
-    public AnalysisResponse analysis(@PathVariable Long id) {
-        return scoringService.analyze(resumeService.getById(id));
+    public AnalysisResponse analysis(@PathVariable Long id,
+                                     @AuthenticationPrincipal Jwt jwt) {
+        return scoringService.analyze(resumeService.getOwned(id, userId(jwt)));
+    }
+
+    // The token's subject is the user id we put there in JwtService
+    private Long userId(Jwt jwt) {
+        return Long.valueOf(jwt.getSubject());
     }
 }
